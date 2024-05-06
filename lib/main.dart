@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:doomsday_app/database.dart';
 import 'package:doomsday_app/doomsday.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 
 var logger = Logger(
@@ -18,7 +18,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const MyApp());
+  runApp(ChangeNotifierProvider(
+    create: (context) => ClockModel(),
+    child: const MyApp(),
+  ));
 }
 
 class MyApp extends StatelessWidget {
@@ -74,15 +77,6 @@ class MyApp extends StatelessWidget {
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
   final String title;
 
   @override
@@ -92,12 +86,6 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.primary,
@@ -121,31 +109,14 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-class Clock extends StatefulWidget {
-  const Clock({super.key});
+class ClockModel extends ChangeNotifier {
+  Timer _timer = Timer.periodic(const Duration(seconds: 1), (_) {});
+  DateTime _targetDate = DateTime(2030, 12, 31);
+  Duration _countdownDuration = const Duration();
+  String _title = "";
 
-  @override
-  State<Clock> createState() => _ClockState();
-}
-
-class _ClockState extends State<Clock> {
-  late Timer _timer;
-  late DateTime _targetDate;
-  late Duration _countdownDuration;
-
-  @override
-  void initState() {
-    super.initState();
-    // Set the target date to a future date
-    _targetDate = DateTime(2030, 12, 31);
-    // Calculate the initial countdown duration
-    _countdownDuration = _targetDate.difference(DateTime.now());
-    // Start the countdown timer
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() {
-        _countdownDuration = _targetDate.difference(DateTime.now());
-      });
-    });
+  ClockModel() {
+    _timer.cancel();
   }
 
   @override
@@ -154,20 +125,89 @@ class _ClockState extends State<Clock> {
     super.dispose();
   }
 
+  void setTimer(DateTime targetDate) {
+    // cancel the previous timer if it is running
+    if (_timer.isActive) _timer.cancel();
+    _targetDate = targetDate;
+    _countdownDuration = _targetDate.difference(DateTime.now());
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _countdownDuration = _targetDate.difference(DateTime.now());
+      notifyListeners();
+    });
+  }
+
+  void changeTarget(Doomsday doomsday) {
+    _targetDate = doomsday.date!;
+    _title = doomsday.title!;
+    notifyListeners();
+    setTimer(_targetDate);
+  }
+
+  String get title => _title;
+
+  Duration get countdownDuration => _countdownDuration;
+}
+
+class Clock extends StatefulWidget {
+  const Clock({super.key});
+
+  @override
+  State<Clock> createState() => _ClockState();
+}
+
+class _ClockState extends State<Clock> {
+  // late Timer _timer;
+  // late DateTime _targetDate;
+  // late Duration _countdownDuration;
+  // String _title = 'Doomsday Event Name';
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   // Set the target date to a future date
+  //   _targetDate = DateTime(2030, 12, 31);
+  //   // Calculate the initial countdown duration
+  //   // _countdownDuration = _targetDate.difference(DateTime.now());
+  //   // Start the countdown timer
+  //   _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+  //     setState(() {
+  //       _countdownDuration = _targetDate.difference(DateTime.now());
+  //     });
+  //     // _title = "Choose a doomsday event from the list below";
+  //   });
+  // }
+
+  // @override
+  // void dispose() {
+  //   _timer.cancel();
+  //   super.dispose();
+  // }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        '${_countdownDuration.inDays} days ${_countdownDuration.inHours.remainder(24).toString().padLeft(2, '0')}:${_countdownDuration.inMinutes.remainder(60).toString().padLeft(2, '0')}:${_countdownDuration.inSeconds.remainder(60).toString().padLeft(2, '0')}',
-        style: Theme.of(context).textTheme.displayLarge,
-      ),
-    );
+    return Consumer<ClockModel>(builder: (context, clockModel, child) {
+      return Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '${clockModel._countdownDuration.inDays} days ${clockModel._countdownDuration.inHours.remainder(24).toString().padLeft(2, '0')}:${clockModel._countdownDuration.inMinutes.remainder(60).toString().padLeft(2, '0')}:${clockModel._countdownDuration.inSeconds.remainder(60).toString().padLeft(2, '0')}',
+              style: Theme.of(context).textTheme.displayLarge,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            clockModel._title,
+            style: Theme.of(context).textTheme.displayMedium,
+          ),
+        ],
+      );
+    });
   }
 }
 
@@ -179,31 +219,9 @@ class UpcomingDoomsdays extends StatefulWidget {
 }
 
 class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
-  // Get list of doomsdays from firestore
-  // final Database _database_ = Database();
-  // List<Doomsday> _doomsdays = [];
+  final ClockModel _clockModel = ClockModel();
+  //base url for the images
   final String _appBaseIMGUrl = 'https://doomsday-app.web.app/images/';
-  // void _fetchDoomsdayData() async {
-  //   _database_.downloadCollection('doomsdays').then((data) {
-  //     setState(() {
-  //       _doomsdays = data
-  //           .map((e) => Doomsday(
-  //                 category: e['category'],
-  //                 title: e['title'],
-  //                 date: e['date'],
-  //                 description: e['description'],
-  //                 image: _appBaseIMGUrl + e['image'],
-  //                 icon: _appBaseIMGUrl + e['icon'],
-  //               ))
-  //           .toList();
-  //     });
-  //   });
-  //   logger.i('Fetched doomsday data');
-  // }
-
-  // _UpcomingDoomsdaysState() {
-  //   _fetchDoomsdayData();
-  // }
   @override
   Widget build(BuildContext context) {
     //get the theme of the app
@@ -264,6 +282,11 @@ class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
                         },
                       );
                     }
+                    // Change the target date and title
+                    Provider.of<ClockModel>(context, listen: false)
+                        .changeTarget(doomsdays[index]);
+                    logger.i(
+                        'Changing target to ${doomsdays[index].title} on ${doomsdays[index].date}');
                   },
                 ),
               );
