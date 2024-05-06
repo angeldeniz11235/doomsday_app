@@ -219,7 +219,6 @@ class UpcomingDoomsdays extends StatefulWidget {
 }
 
 class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
-  final ClockModel _clockModel = ClockModel();
   //base url for the images
   final String _appBaseIMGUrl = 'https://doomsday-app.web.app/images/';
   @override
