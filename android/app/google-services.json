@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "923399469156",
+    "project_id": "doomsday-app",
+    "storage_bucket": "doomsday-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:923399469156:android:507da1b48fe8d340970771",
+        "android_client_info": {
+          "package_name": "com.example.doomsday_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbSV8U4i1z55w057Y171ICPKQWeY1NWSw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

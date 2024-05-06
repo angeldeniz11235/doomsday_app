@@ -1,14 +1,23 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:doomsday_app/database.dart';
 import 'package:doomsday_app/doomsday.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 var logger = Logger(
   printer: PrettyPrinter(), // Use the PrettyPrinter to format and print log
   level: Level.info, // Print only info level logs
 );
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 
@@ -170,100 +179,101 @@ class UpcomingDoomsdays extends StatefulWidget {
 }
 
 class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
-  final List<Doomsday> _doomsdays = <Doomsday>[
-    Doomsday(
-        date: DateTime.parse('2022-12-31'),
-        description: 'Possible asteroid impact',
-        imageUrl: 'https://example.com/asteroid.jpg'),
-    Doomsday(
-        date: DateTime.parse('2023-01-01'),
-        description: 'Alien invasion',
-        imageUrl: 'https://example.com/alien.jpg'),
-    Doomsday(
-        date: DateTime.parse('2024-01-01'),
-        description: 'Zombie apocalypse',
-        imageUrl: 'https://example.com/zombie.jpg'),
-    Doomsday(
-        date: DateTime.parse('2025-01-01'),
-        description: 'Nuclear war',
-        imageUrl: 'https://example.com/nuclear.jpg'),
-    Doomsday(
-        date: DateTime.parse('2026-01-01'),
-        description: 'Artificial intelligence uprising',
-        imageUrl: 'https://example.com/ai.jpg'),
-    Doomsday(
-        date: DateTime.parse('2027-01-01'),
-        description: 'Global pandemic',
-        imageUrl: 'https://example.com/pandemic.jpg'),
-    Doomsday(
-        date: DateTime.parse('2028-01-01'),
-        description: 'Climate catastrophe',
-        imageUrl:
-            'https://static.scientificamerican.com/sciam/cache/file/9593645C-DD5F-4387-B84EDEA9B63E9338_source.jpg?w=900'),
-    Doomsday(
-        date: DateTime.parse('2029-01-01'),
-        description: 'Robot uprising',
-        imageUrl: 'https://example.com/robot.jpg'),
-    Doomsday(
-        date: DateTime.parse('2030-01-01'),
-        description: 'Supervolcano eruption',
-        imageUrl: 'https://example.com/supervolcano.jpg'),
-    Doomsday(
-        date: DateTime.parse('2031-01-01'),
-        description: 'Worldwide economic collapse',
-        imageUrl: 'https://example.com/economic.jpg'),
-  ];
+  // Get list of doomsdays from firestore
+  // final Database _database_ = Database();
+  // List<Doomsday> _doomsdays = [];
+  final String _appBaseIMGUrl = 'https://doomsday-app.web.app/images/';
+  // void _fetchDoomsdayData() async {
+  //   _database_.downloadCollection('doomsdays').then((data) {
+  //     setState(() {
+  //       _doomsdays = data
+  //           .map((e) => Doomsday(
+  //                 category: e['category'],
+  //                 title: e['title'],
+  //                 date: e['date'],
+  //                 description: e['description'],
+  //                 image: _appBaseIMGUrl + e['image'],
+  //                 icon: _appBaseIMGUrl + e['icon'],
+  //               ))
+  //           .toList();
+  //     });
+  //   });
+  //   logger.i('Fetched doomsday data');
+  // }
 
+  // _UpcomingDoomsdaysState() {
+  //   _fetchDoomsdayData();
+  // }
   @override
   Widget build(BuildContext context) {
     //get the theme of the app
     final theme = Theme.of(context);
-    return ListView.builder(
-      itemCount: _doomsdays.length,
-      itemBuilder: (context, index) {
-        return Card(
-          child: ListTile(
-            leading: _doomsdays[index].imageUrl != null
-                ? FutureBuilder<Image>(
-                    future: _doomsdays[index].loadIcon(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.done) {
-                        return snapshot.data!;
-                      } else {
-                        return const CircularProgressIndicator();
-                      }
-                    },
-                  )
-                : null,
-            title: Text(
-              _doomsdays[index].date.toString(),
-              style: theme.textTheme.titleMedium!.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            subtitle: Text(_doomsdays[index].description),
-            tileColor: theme.colorScheme.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            contentPadding: const EdgeInsets.all(10),
-            onTap: () {
-              // Show a dialog with the image if available
-              if (_doomsdays[index].imageUrl != null) {
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    logger.i(
-                        'Showing image for doomsday: ${_doomsdays[index].description}');
-                    return AlertDialog(
-                      content: Image.network(_doomsdays[index].imageUrl!),
-                    );
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('doomsday').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          final doomsdays = snapshot.data!.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return Doomsday(
+              category: data['category'],
+              title: data['title'],
+              date: data['date'] != null ? DateTime.parse(data['date']) : null,
+              description: data['description'],
+              image: _appBaseIMGUrl + data['image'],
+              icon: _appBaseIMGUrl + data['icon'],
+            );
+          }).toList();
+          return ListView.builder(
+            itemCount: doomsdays.length,
+            itemBuilder: (context, index) {
+              return Card(
+                child: ListTile(
+                  leading: doomsdays[index].icon != null
+                      ? Image.network(
+                          doomsdays[index].icon!,
+                          width: 50,
+                          height: 50,
+                          errorBuilder: (context, exception, stackTrace) {
+                            return const Icon(Icons.error, color: Colors.red);
+                          },
+                        )
+                      : null,
+                  title: Text(
+                    doomsdays[index].date.toString(),
+                    style: theme.textTheme.titleMedium!.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(doomsdays[index].description ?? ""),
+                  tileColor: theme.colorScheme.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  contentPadding: const EdgeInsets.all(10),
+                  onTap: () {
+                    // Show a dialog with the image if available
+                    if (doomsdays[index].image != null) {
+                      showDialog(
+                        context: context,
+                        builder: (context) {
+                          logger.i(
+                              'Showing image for doomsday: ${doomsdays[index].description}');
+                          return AlertDialog(
+                            content: Image.network(doomsdays[index].image!),
+                          );
+                        },
+                      );
+                    }
                   },
-                );
-              }
+                ),
+              );
             },
-          ),
-        );
+          );
+        } else if (snapshot.hasError) {
+          return Text('Error: ${snapshot.error}');
+        } else {
+          return const CircularProgressIndicator();
+        }
       },
     );
   }

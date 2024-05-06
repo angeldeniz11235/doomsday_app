@@ -1,17 +1,21 @@
 //Class to represent a particular doomsday
 // including the date, description, and a possible image.
 
-import 'package:flutter/material.dart';
-
 class Doomsday {
-  final DateTime date;
-  final String description;
-  final String? imageUrl;
+  final String? category;
+  final String? title;
+  final DateTime? date;
+  final String? description;
+  final String? image;
+  final String? icon;
 
   const Doomsday({
-    required this.date,
-    required this.description,
-    this.imageUrl,
+    this.category,
+    this.title,
+    this.date,
+    this.description,
+    this.image,
+    this.icon,
   });
 
   // load the image from the network
@@ -20,15 +24,14 @@ class Doomsday {
   // }
 
   // create an icon sized image
-  Future<Image> loadIcon() async {
-    return Image.network(
-      imageUrl!,
-      width: 50,
-      height: 50,
-      errorBuilder:
-          (BuildContext context, Object exception, StackTrace? stackTrace) {
-        return const Icon(Icons.error, color: Colors.red);
-      },
-    );
-  }
+  // Future<Image> loadIcon() async {
+  //   return Image.network(
+  //     imageUrl!,
+  //     width: 50,
+  //     height: 50,
+  //     errorBuilder:
+  //         (BuildContext context, Object exception, StackTrace? stackTrace) {
+  //       return const Icon(Icons.error, color: Colors.red);
+  //     },
+  //   );
 }

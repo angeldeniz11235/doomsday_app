@@ -1,0 +1,66 @@
+[
+    {
+        "category": "Outer Space",
+        "title": "Possible Asteroid Impact",
+        "description": "Asteroid 2014 UR116 has a 1 in 1,000,000 chance of hitting Earth in 2041.",
+        "date": "2014-12-06",
+        "image": "resized/asteroid-impact1.png",
+        "icon": "icons/asteroid-impact1.png"
+    },
+    {
+        "category": "Outer Space",
+        "title": "Possible Asteroid Impact",
+        "description": "Asteroid 2023 DW has a 1 in 10,000 chance of hitting Earth in 2046.",
+        "date": "2046-02-14",
+        "image": "resized/asteroid-impact1.png",
+        "icon": "icons/asteroid-impact1.png"
+    },
+    {
+        "category": "Outer Space",
+        "title": "Possible Asteroid Impact",
+        "description": "Asteroid 2015 QW has a 1 in 100 chance of hitting Earth in 2049.",
+        "date": "2049-11-30",
+        "image": "resized/asteroid-impact1.png",
+        "icon": "icons/asteroid-impact1.png"
+    },
+    {
+        "category": "Man Made",
+        "title": "Polar Ice Caps Melt",
+        "description": "The polar ice caps are forecasted to melt by 2050.",
+        "date": "2050-06-15",
+        "image": "resized/ice-caps-melting1.png",
+        "icon": "icons/ice-caps-melting1.png"
+    },
+    {
+        "category": "Man Made",
+        "title": "Global Warming",
+        "description": "Global temperatures are expected to rise by 2 degrees by 2100.",
+        "date": "2100-12-31",
+        "image": "resized/global-warming1.png",
+        "icon": "icons/global-warming1.png"
+    },
+    {
+        "category": "Man Made",
+        "title": "Rising Sea Levels",
+        "description": "Sea levels are expected to rise by 1 meter by 2150.",
+        "date": "2150-01-01",
+        "image": "resized/sea-level-rise1.png",
+        "icon": "icons/sea-level-rise1.png"
+    },
+    {
+        "category": "Man Made",
+        "title": "Desertification",
+        "description": "Desertification is expected to increase by 50% by 2200.",
+        "date": "2200-01-01",
+        "image": "resized/desertification1.png",
+        "icon": "icons/desertification1.png"
+    },
+    {
+        "category": "Man Made",
+        "title": "Mass Extinction",
+        "description": "A mass extinction event is expected to occur by 2300.",
+        "date": "2300-01-01",
+        "image": "resized/mass-extinction.png",
+        "icon": "icons/mass-extinction.png"
+    }
+]
