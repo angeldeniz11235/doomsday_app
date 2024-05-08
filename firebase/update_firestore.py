@@ -37,5 +37,8 @@ def delete_collection(coll_name):
     for doc in docs:
         doc.reference.delete()
         
+
+delete_collection('doomsday')
+print("Deleted doomsday collection")
 add_doomsday_data()
-#delete_collection('doomsday')
+print("Added doomsday data to firestore")

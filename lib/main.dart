@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:doomsday_app/add_doomsday.dart';
 import 'package:doomsday_app/doomsday.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
@@ -7,16 +9,20 @@ import 'package:logger/logger.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 var logger = Logger(
   printer: PrettyPrinter(), // Use the PrettyPrinter to format and print log
-  level: Level.info, // Print only info level logs
+  level: Level.debug, // Print at debug and above
 );
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await FirebaseAppCheck.instance.activate(
+    androidProvider: AndroidProvider.debug,
   );
   runApp(ChangeNotifierProvider(
     create: (context) => ClockModel(),
@@ -30,32 +36,11 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+    logger.i('Building MyApp');
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Doomsday Clock',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSwatch(
-          primarySwatch: Colors.blue,
-          backgroundColor: Colors.grey,
-          accentColor: Colors.orange,
-          errorColor: Colors.red,
-          cardColor: Colors.white,
-          brightness: Brightness.light,
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.red[600]!),
         textTheme: const TextTheme(
           displayLarge: TextStyle(
             fontSize: 32,
@@ -86,6 +71,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
+    logger.i('Building MyHomePage');
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.primary,
@@ -98,9 +84,19 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Clock(),
+            Align(
+              alignment: Alignment.center,
+              child: Clock(),
+            ),
             Expanded(
               child: UpcomingDoomsdays(),
+            ),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Padding(
+                padding: EdgeInsets.all(8.0),
+                child: _FloatingActionButton(),
+              ),
             ),
           ],
         ),
@@ -114,6 +110,7 @@ class ClockModel extends ChangeNotifier {
   DateTime _targetDate = DateTime(2030, 12, 31);
   Duration _countdownDuration = const Duration();
   String _title = "";
+  bool _hidden = true;
 
   ClockModel() {
     _timer.cancel();
@@ -141,6 +138,12 @@ class ClockModel extends ChangeNotifier {
     _title = doomsday.title!;
     notifyListeners();
     setTimer(_targetDate);
+    logger.i('Target changed to ${doomsday.title} on ${doomsday.date}');
+  }
+
+  void isHidden(bool value) {
+    _hidden = value;
+    notifyListeners();
   }
 
   String get title => _title;
@@ -156,57 +159,38 @@ class Clock extends StatefulWidget {
 }
 
 class _ClockState extends State<Clock> {
-  // late Timer _timer;
-  // late DateTime _targetDate;
-  // late Duration _countdownDuration;
-  // String _title = 'Doomsday Event Name';
-
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   // Set the target date to a future date
-  //   _targetDate = DateTime(2030, 12, 31);
-  //   // Calculate the initial countdown duration
-  //   // _countdownDuration = _targetDate.difference(DateTime.now());
-  //   // Start the countdown timer
-  //   _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-  //     setState(() {
-  //       _countdownDuration = _targetDate.difference(DateTime.now());
-  //     });
-  //     // _title = "Choose a doomsday event from the list below";
-  //   });
-  // }
-
-  // @override
-  // void dispose() {
-  //   _timer.cancel();
-  //   super.dispose();
-  // }
-
   @override
   Widget build(BuildContext context) {
+    logger.i('Building Clock');
     return Consumer<ClockModel>(builder: (context, clockModel, child) {
-      return Column(
-        children: [
-          Container(
-            margin: const EdgeInsets.all(20),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '${clockModel._countdownDuration.inDays} days ${clockModel._countdownDuration.inHours.remainder(24).toString().padLeft(2, '0')}:${clockModel._countdownDuration.inMinutes.remainder(60).toString().padLeft(2, '0')}:${clockModel._countdownDuration.inSeconds.remainder(60).toString().padLeft(2, '0')}',
-              style: Theme.of(context).textTheme.displayLarge,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            clockModel._title,
-            style: Theme.of(context).textTheme.displayMedium,
-          ),
-        ],
-      );
+      return
+          // If the countdown is hidden, return an empty container
+          clockModel._hidden
+              ? const SizedBox()
+              : Column(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '${clockModel._countdownDuration.inDays} days ${clockModel._countdownDuration.inHours.remainder(24).toString().padLeft(2, '0')}:${clockModel._countdownDuration.inMinutes.remainder(60).toString().padLeft(2, '0')}:${clockModel._countdownDuration.inSeconds.remainder(60).toString().padLeft(2, '0')}',
+                            style: Theme.of(context).textTheme.displayLarge,
+                          ),
+                          Text(
+                            "Until ${clockModel._title}",
+                            style: Theme.of(context).textTheme.displayMedium,
+                          ),
+                        ],
+                      ),
+                    )
+                  ],
+                );
     });
   }
 }
@@ -220,11 +204,13 @@ class UpcomingDoomsdays extends StatefulWidget {
 
 class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
   //base url for the images
-  final String _appBaseIMGUrl = 'https://doomsday-app.web.app/images/';
+
+  final storageRef = FirebaseStorage.instance.ref();
   @override
   Widget build(BuildContext context) {
     //get the theme of the app
     final theme = Theme.of(context);
+    logger.i('Building UpcomingDoomsdays');
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('doomsday').snapshots(),
       builder: (context, snapshot) {
@@ -236,25 +222,95 @@ class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
               title: data['title'],
               date: data['date'] != null ? DateTime.parse(data['date']) : null,
               description: data['description'],
-              image: _appBaseIMGUrl + data['image'],
-              icon: _appBaseIMGUrl + data['icon'],
+              image: data['image'],
+              icon: data['icon'],
             );
           }).toList();
           return ListView.builder(
             itemCount: doomsdays.length,
             itemBuilder: (context, index) {
               return Card(
+                elevation: 3.0,
                 child: ListTile(
-                  leading: doomsdays[index].icon != null
-                      ? Image.network(
-                          doomsdays[index].icon!,
-                          width: 50,
-                          height: 50,
-                          errorBuilder: (context, exception, stackTrace) {
-                            return const Icon(Icons.error, color: Colors.red);
+                  leading: GestureDetector(
+                    child: doomsdays[index].icon != null
+                        ? FutureBuilder(
+                            future: storageRef
+                                .child(doomsdays[index].icon!)
+                                .getDownloadURL(),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.done) {
+                                return snapshot.data != null
+                                    ? Image.network(
+                                        snapshot.data as String,
+                                        width: 50,
+                                        height: 50,
+                                        errorBuilder:
+                                            (context, exception, stackTrace) {
+                                          return const Icon(Icons.error,
+                                              color: Colors.red);
+                                        },
+                                      )
+                                    : const Icon(Icons.error,
+                                        color: Colors.red);
+                              }
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const CircularProgressIndicator();
+                              }
+                              return const Icon(Icons.error, color: Colors.red);
+                            },
+                          )
+                        : null,
+                    onTap: () {
+                      // Show a dialog with the image if available
+                      if (doomsdays[index].image != null) {
+                        showDialog(
+                          context: context,
+                          builder: (context) {
+                            logger.i(
+                                'Showing image for doomsday: ${doomsdays[index].description}');
+                            return AlertDialog(
+                              content: doomsdays[index].image != null
+                                  ? FutureBuilder(
+                                      future: storageRef
+                                          .child(doomsdays[index].image!)
+                                          .getDownloadURL(),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.connectionState ==
+                                            ConnectionState.done) {
+                                          return Image.network(
+                                            snapshot.data as String,
+                                            loadingBuilder: (context, child,
+                                                loadingProgress) {
+                                              if (loadingProgress == null) {
+                                                return child;
+                                              }
+                                              return const CircularProgressIndicator();
+                                            },
+                                            errorBuilder: (context, exception,
+                                                stackTrace) {
+                                              return const Icon(Icons.error,
+                                                  color: Colors.red);
+                                            },
+                                          );
+                                        }
+                                        if (snapshot.connectionState ==
+                                            ConnectionState.waiting) {
+                                          return const CircularProgressIndicator();
+                                        }
+                                        return const Icon(Icons.error,
+                                            color: Colors.red);
+                                      },
+                                    )
+                                  : null,
+                            );
                           },
-                        )
-                      : null,
+                        );
+                      }
+                    },
+                  ),
                   title: Text(
                     doomsdays[index].date.toString(),
                     style: theme.textTheme.titleMedium!.copyWith(
@@ -268,22 +324,12 @@ class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
                   ),
                   contentPadding: const EdgeInsets.all(10),
                   onTap: () {
-                    // Show a dialog with the image if available
-                    if (doomsdays[index].image != null) {
-                      showDialog(
-                        context: context,
-                        builder: (context) {
-                          logger.i(
-                              'Showing image for doomsday: ${doomsdays[index].description}');
-                          return AlertDialog(
-                            content: Image.network(doomsdays[index].image!),
-                          );
-                        },
-                      );
-                    }
                     // Change the target date and title
                     Provider.of<ClockModel>(context, listen: false)
                         .changeTarget(doomsdays[index]);
+                    // unhide the countdown
+                    Provider.of<ClockModel>(context, listen: false)
+                        .isHidden(false);
                     logger.i(
                         'Changing target to ${doomsdays[index].title} on ${doomsdays[index].date}');
                   },
@@ -292,11 +338,34 @@ class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
             },
           );
         } else if (snapshot.hasError) {
+          logger.e('Error: ${snapshot.error}');
           return Text('Error: ${snapshot.error}');
         } else {
+          logger.i('Loading data...');
           return const CircularProgressIndicator();
         }
       },
+    );
+  }
+}
+
+class _FloatingActionButton extends StatelessWidget {
+  const _FloatingActionButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    logger.i('Building _FloatingActionButton');
+    return FloatingActionButton(
+      onPressed: () {
+        //navigate to the add doomsday screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AddDoomsdayPage()),
+        );
+        logger.d('Add Doomsday button pressed.');
+      },
+      tooltip: 'Add Doomsday',
+      child: const Icon(Icons.add),
     );
   }
 }
