@@ -8,6 +8,7 @@ class Doomsday {
   final String? description;
   final String? image;
   final String? icon;
+  final String? docId;
 
   const Doomsday({
     this.category,
@@ -16,6 +17,7 @@ class Doomsday {
     this.description,
     this.image,
     this.icon,
+    required this.docId,
   });
 
   // load the image from the network

@@ -224,6 +224,7 @@ class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
               description: data['description'],
               image: data['image'],
               icon: data['icon'],
+              docId: doc.id,
             );
           }).toList();
           return ListView.builder(
@@ -312,7 +313,7 @@ class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
                     },
                   ),
                   title: Text(
-                    doomsdays[index].date.toString(),
+                    "${doomsdays[index].date!.year} ${doomsdays[index].title} ",
                     style: theme.textTheme.titleMedium!.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -323,6 +324,27 @@ class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   contentPadding: const EdgeInsets.all(10),
+                  trailing: GestureDetector(
+                    child: const Icon(Icons.delete, color: Colors.red),
+                    onTap: () {
+                      logger.i(
+                          'Deleting doomsday: ${doomsdays[index].description}');
+                      // Delete the doomsday
+                      FirebaseFirestore.instance
+                          .collection('doomsday')
+                          .doc(doomsdays[index].docId)
+                          .delete();
+                      logger.i(
+                          'Doomsday ${doomsdays[index].title} deleted from firestore.');
+                      //show a message to confirm deletion
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                              'Doomsday ${doomsdays[index].title} deleted.'),
+                        ),
+                      );
+                    },
+                  ),
                   onTap: () {
                     // Change the target date and title
                     Provider.of<ClockModel>(context, listen: false)
