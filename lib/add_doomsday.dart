@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:doomsday_app/main.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 class AddDoomsdayPage extends StatefulWidget {
   const AddDoomsdayPage({super.key});
@@ -12,11 +13,9 @@ class AddDoomsdayPage extends StatefulWidget {
 class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
   late DateTime selectedDate;
   late String description;
-  late String? selectedImage;
+  late ImageData? selectedImage;
   late String? selectedCategory;
-
-  //map of image names to their urls
-  final Map<String, Image> _iconImageMap = {};
+  late String? title;
 
   // list of available categories
   final _categoryList = <String>[];
@@ -25,37 +24,14 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
   _AddDoomsdayPageState() {
     selectedDate = DateTime.now();
     description = '';
-    selectedImage = '';
+    selectedImage = null;
     selectedCategory = '';
-    loadIconsToMap();
+    title = '';
   }
 
-//load the icons from firebase storage
-  void loadIconsToMap() async {
-    final storageRef = FirebaseStorage.instance.ref();
-    final ListResult result = await storageRef.child('images/icons').list();
-    for (final Reference ref in result.items) {
-      final String name = ref.name;
-      final String url = await ref.getDownloadURL();
-      _iconImageMap[name] = Image.network(
-        url,
-        width: 50,
-        height: 50,
-        errorBuilder:
-            (BuildContext context, Object exception, StackTrace? stackTrace) {
-          return const Icon(Icons.error, color: Colors.red);
-        },
-      );
-    }
-    selectedImage = _iconImageMap.keys.first;
-  }
+  final imageDropdownItems = <DropdownMenuItem<ImageData>>[];
 
-  List<String> images = [
-    'image1.jpg',
-    'image2.jpg',
-    'image3.jpg',
-    // Add more image paths here
-  ];
+  final FirebaseStorage storage = FirebaseStorage.instance;
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +68,7 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
               },
               child: Text(selectedDate.difference(DateTime.now()) >
                       const Duration(minutes: 5)
-                  ? selectedDate.toString()
+                  ? selectedDate.toLocal().toString().split(' ')[0]
                   : 'Select a date'),
             ),
             const SizedBox(height: 16.0),
@@ -117,9 +93,7 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
                           selectedCategory = value as String;
                         });
                       },
-                      value: selectedCategory == ''
-                          ? _categoryList.first
-                          : selectedCategory,
+                      value: selectedCategory == '' ? null : selectedCategory,
                       items: _categoryList.map((category) {
                         return DropdownMenuItem<String>(
                           value: category,
@@ -153,30 +127,51 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
             Container(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               height: 80.0,
-              child: DropdownButton(
-                isExpanded: true,
-                onChanged: (value) {
-                  setState(() {
-                    selectedImage = value!;
-                  });
-                  logger.i('Selected Image: $value');
+              child: FutureBuilder<List<ImageData>>(
+                future: _loadImageData(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    final imageData = snapshot.data!;
+                    imageDropdownItems.clear();
+                    imageDropdownItems.addAll(imageData.map((item) {
+                      return DropdownMenuItem<ImageData>(
+                        value: item,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Row(
+                            children: [
+                              item.image,
+                              const SizedBox(width: 16.0),
+                              Text(item.imageName),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList());
+
+                    return DropdownButton<ImageData>(
+                      items: imageDropdownItems,
+                      onChanged: (value) {
+                        selectedImage = null;
+                        // Handle dropdown item selection
+                        if (value != null) {
+                          selectedImage = imageData.firstWhere(
+                            (element) => element.id == value.id,
+                          );
+                          logger
+                              .d('Selected image: ${selectedImage!.imageName}');
+                        }
+                        // update the widget
+                        setState(() {});
+                      },
+                      value: selectedImage,
+                    );
+                  } else if (snapshot.hasError) {
+                    return Text('Error: ${snapshot.error}');
+                  } else {
+                    return const CircularProgressIndicator();
+                  }
                 },
-                value: selectedImage,
-                items: _iconImageMap.entries.map((entry) {
-                  final String imageName = entry.key;
-                  final Image image = entry.value;
-                  logger.d('Adding image: $imageName to dropdown.');
-                  return DropdownMenuItem<String>(
-                    value: imageName,
-                    child: Row(
-                      children: [
-                        image,
-                        const SizedBox(width: 16.0),
-                        Text(imageName),
-                      ],
-                    ),
-                  );
-                }).toList(),
               ),
             ),
             const SizedBox(height: 32.0),
@@ -186,6 +181,20 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
                 ElevatedButton(
                   onPressed: () {
                     // Add logic for 'add' button
+                    //check that all fields are filled
+                    if (selectedCategory == '' ||
+                        title == '' ||
+                        description == '' ||
+                        selectedImage == '' ||
+                        (selectedDate.difference(DateTime.now()) <
+                            const Duration(days: 1))) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please fill all fields.'),
+                        ),
+                      );
+                      return;
+                    }
                   },
                   child: const Text('Add'),
                 ),
@@ -203,4 +212,49 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
       ),
     );
   }
+
+  Future<List<ImageData>> _loadImageData() async {
+    // if imageDropdownItems is not empty, return it (to avoid reloading the images every time the widget is rebuilt)
+    if (imageDropdownItems.isNotEmpty) {
+      logger.d('Loading images from memory');
+      return imageDropdownItems.map((e) => e.value!).toList();
+    } else {
+      logger.d('Loading images from storage');
+      String path = 'images/icons';
+      final listOfIconsRef = await storage.ref(path).listAll();
+      final List<ImageData> imageData = [];
+      for (final iconRef in listOfIconsRef.items) {
+        final downloadUrl = await iconRef.getDownloadURL();
+        final imageName = iconRef.name;
+        imageData.add(ImageData(
+          imageName: imageName,
+          image: Image.network(downloadUrl),
+          id: iconRef.fullPath,
+        ));
+      }
+      return imageData;
+    }
+  }
+}
+
+class ImageData {
+  final String imageName;
+  // final String imageStoragePath;
+  final Image image;
+  final String id;
+
+  ImageData(
+      {required this.imageName,
+      // required this.imageStoragePath,
+      required this.image,
+      String? id})
+      : id = id ?? const Uuid().v4();
+
+// == and hashCode methods are required to compare objects in the list
+// or else the dropdownbutton will not work properly
+  @override
+  bool operator ==(Object other) => other is ImageData && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
