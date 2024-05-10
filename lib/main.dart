@@ -40,7 +40,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Doomsday Clock',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.red[600]!),
+        colorScheme:
+            ColorScheme.fromSeed(seedColor: Color.fromARGB(255, 255, 0, 0)!),
         textTheme: const TextTheme(
           displayLarge: TextStyle(
             fontSize: 32,
@@ -203,9 +204,11 @@ class UpcomingDoomsdays extends StatefulWidget {
 }
 
 class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
-  //base url for the images
-
+  // Create a reference to the Firebase Storage
   final storageRef = FirebaseStorage.instance.ref();
+
+  //selected list tile
+  final Set<int> _selectedIndices = {};
   @override
   Widget build(BuildContext context) {
     //get the theme of the app
@@ -228,11 +231,14 @@ class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
             );
           }).toList();
           return ListView.builder(
+            controller: ScrollController(),
             itemCount: doomsdays.length,
             itemBuilder: (context, index) {
               return Card(
                 elevation: 3.0,
                 child: ListTile(
+                  selected: _selectedIndices.contains(index),
+                  selectedTileColor: theme.colorScheme.surface.withAlpha(25),
                   leading: GestureDetector(
                     child: doomsdays[index].icon != null
                         ? FutureBuilder(
@@ -346,6 +352,16 @@ class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
                     },
                   ),
                   onTap: () {
+                    // When a doomsday is tapped change the selected card
+                    setState(() {
+                      _selectedIndices.clear();
+                      if (_selectedIndices.contains(index)) {
+                        _selectedIndices.remove(index);
+                      } else {
+                        _selectedIndices.add(index);
+                      }
+                    });
+
                     // Change the target date and title
                     Provider.of<ClockModel>(context, listen: false)
                         .changeTarget(doomsdays[index]);
