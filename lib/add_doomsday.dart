@@ -1,8 +1,14 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:doomsday_app/main.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:uuid/uuid.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;
 
 class AddDoomsdayPage extends StatefulWidget {
   const AddDoomsdayPage({super.key});
@@ -34,7 +40,7 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
   final FirebaseStorage storage = FirebaseStorage.instance;
 
   @override
-  Widget build(BuildContext context) {
+  build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -89,18 +95,71 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
                       return DropdownButton(
                         isExpanded: true,
                         onChanged: (value) {
+                          if (value == 'Add Category') {
+                            logger.d('Adding category');
+                            // Add category
+                            showDialog(
+                              context: context,
+                              builder: (context) {
+                                final TextEditingController controller =
+                                    TextEditingController();
+                                return AlertDialog(
+                                  title: const Text('Add Category'),
+                                  content: TextField(
+                                    controller: controller,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Category',
+                                    ),
+                                  ),
+                                  actions: [
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        // Add category to the database
+                                        FirebaseFirestore.instance
+                                            .collection('categories')
+                                            .add({
+                                          'category': controller.text,
+                                        });
+                                        logger.d(
+                                            'Adding category to the database: ${controller.text}');
+                                        // Update category
+                                        setState(() {
+                                          selectedCategory = controller.text;
+                                        });
+                                        Navigator.pop(context);
+                                      },
+                                      child: const Text('Add'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                      },
+                                      child: const Text('Cancel'),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+                            return;
+                          }
                           // Update category
                           setState(() {
                             selectedCategory = value as String;
                           });
                         },
                         value: selectedCategory == '' ? null : selectedCategory,
-                        items: _categoryList.map((category) {
-                          return DropdownMenuItem<String>(
-                            value: category,
-                            child: Text(category),
-                          );
-                        }).toList(),
+                        items: [
+                          ..._categoryList.map((category) {
+                            return DropdownMenuItem<String>(
+                              value: category,
+                              child: Text(category),
+                            );
+                          }),
+                          const DropdownMenuItem<String>(
+                            value: 'Add Category',
+                            child: Text('+ Add Category'),
+                          ),
+                        ],
                       );
                     }
                     return const CircularProgressIndicator();
@@ -149,19 +208,108 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
                               children: [
                                 item.image,
                                 const SizedBox(width: 16.0),
-                                Text(item.imageName),
+                                SizedBox(
+                                  width: 200.0,
+                                  child: Text(item.imageName,
+                                      overflow: TextOverflow.ellipsis),
+                                ),
                               ],
                             ),
                           ),
                         );
                       }).toList());
 
-                      return DropdownButton<ImageData>(
-                        items: imageDropdownItems,
+                      return DropdownButton<dynamic>(
+                        items: [
+                          ...imageDropdownItems,
+                          const DropdownMenuItem<dynamic>(
+                            value: "addImage",
+                            child: Row(
+                              children: [
+                                FaIcon(FontAwesomeIcons.plus),
+                                SizedBox(width: 16.0),
+                                Text('Add Image'),
+                              ],
+                            ),
+                          )
+                        ],
                         onChanged: (value) {
                           selectedImage = null;
+                          if (value == "addImage") {
+                            // Add image
+                            logger.d('Adding image');
+                            // open image picker
+                            ImagePicker()
+                                .pickImage(source: ImageSource.gallery)
+                                .then((image) {
+                              if (image != null) {
+                                // convert image to img.Image format
+                                final img.Image? newImage = img.decodeImage(
+                                    File(image.path).readAsBytesSync());
+                                // convert image to png format
+                                final pngImg = img.encodePng(newImage!);
+                                final pngImgFileName =
+                                    '${image.path.split('/').last.split('.').first}.png';
+                                final ref = storage
+                                    .ref('images/original/$pngImgFileName');
+                                ref
+                                    .putData(
+                                        pngImg,
+                                        SettableMetadata(
+                                            contentType: 'image/png'))
+                                    .then((_) {
+                                  logger.d(
+                                      'Image uploaded successfully to images/original/$pngImgFileName');
+                                });
+                                // resize image to 500x keep aspect ratio
+                                final resizedImg = img.copyResize(newImage,
+                                    width: 500, maintainAspect: true);
+                                final resizedPngImg = img.encodePng(resizedImg);
+                                final resizedRef = storage
+                                    .ref('images/resized/$pngImgFileName');
+                                resizedRef
+                                    .putData(
+                                        resizedPngImg,
+                                        SettableMetadata(
+                                            contentType: 'image/png'))
+                                    .then((_) {
+                                  logger.d(
+                                      'Image uploaded successfully to images/resized/$pngImgFileName');
+                                });
+                                // resize image to 50x50 for icon, crop if necessary
+                                final iconImg = img.copyResize(newImage,
+                                    width: 50,
+                                    height: 50,
+                                    maintainAspect: true);
+                                final iconPngImg = img.encodePng(iconImg);
+                                final iconRef =
+                                    storage.ref('images/icons/$pngImgFileName');
+                                iconRef
+                                    .putData(
+                                        iconPngImg,
+                                        SettableMetadata(
+                                            contentType: 'image/png'))
+                                    .then((_) {
+                                  logger.d(
+                                      'Image uploaded successfully to images/icons/$pngImgFileName');
+                                });
+                              }
+                            });
+                            //let the user know that the image was added
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Image added successfully.'),
+                              ),
+                            );
+                            // reload the images
+                            setState(() {
+                              imageDropdownItems.clear();
+                              _loadImageData();
+                            });
+                            return;
+                          }
                           // Handle dropdown item selection
-                          if (value != null) {
+                          else if (value != null) {
                             selectedImage = imageData.firstWhere(
                               (element) => element.id == value.id,
                             );
