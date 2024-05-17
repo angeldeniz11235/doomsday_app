@@ -367,6 +367,39 @@ class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
                     docId: doc.id,
                   );
                 }).toList();
+                final filterSortModel = Provider.of<FilterSortModel>(context);
+                if (filterSortModel.filter.isNotEmpty) {
+                  doomsdays.retainWhere((doomsday) {
+                    return doomsday.title!.contains(filterSortModel.filter) ||
+                        doomsday.category!.contains(filterSortModel.filter) ||
+                        doomsday.description!.contains(filterSortModel.filter);
+                  });
+                }
+                if (filterSortModel.field == 'date') {
+                  doomsdays.sort((a, b) {
+                    if (filterSortModel.ascending) {
+                      return a.date!.compareTo(b.date!);
+                    } else {
+                      return b.date!.compareTo(a.date!);
+                    }
+                  });
+                } else if (filterSortModel.field == 'title') {
+                  doomsdays.sort((a, b) {
+                    if (filterSortModel.ascending) {
+                      return a.title!.compareTo(b.title!);
+                    } else {
+                      return b.title!.compareTo(a.title!);
+                    }
+                  });
+                } else if (filterSortModel.field == 'category') {
+                  doomsdays.sort((a, b) {
+                    if (filterSortModel.ascending) {
+                      return a.category!.compareTo(b.category!);
+                    } else {
+                      return b.category!.compareTo(a.category!);
+                    }
+                  });
+                }
                 return ListView.builder(
                   shrinkWrap:
                       true, // Added this to limit the height of ListView
@@ -491,6 +524,14 @@ class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
                                 ? _selectedIndices.remove(index)
                                 : _selectedIndices.add(index);
                           });
+                          // Change the target date and title
+                          Provider.of<ClockModel>(context, listen: false)
+                              .changeTarget(doomsdays[index]);
+                          // unhide the countdown
+                          Provider.of<ClockModel>(context, listen: false)
+                              .isHidden(false);
+                          logger.i(
+                              'Changing target to ${doomsdays[index].title} on ${doomsdays[index].date}');
                         },
                       ),
                     );
