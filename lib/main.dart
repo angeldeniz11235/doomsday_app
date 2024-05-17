@@ -3,6 +3,7 @@ import 'package:doomsday_app/add_doomsday.dart';
 import 'package:doomsday_app/doomsday.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
 
@@ -26,7 +27,8 @@ void main() async {
   );
   runApp(ChangeNotifierProvider(
     create: (context) => ClockModel(),
-    child: const MyApp(),
+    child: ChangeNotifierProvider(
+        create: (context) => FilterSortModel(), child: const MyApp()),
   ));
 }
 
@@ -40,8 +42,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Doomsday Clock',
       theme: ThemeData(
-        colorScheme:
-            ColorScheme.fromSeed(seedColor: Color.fromARGB(255, 255, 0, 0)!),
+        colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color.fromARGB(255, 255, 0, 0)),
         textTheme: const TextTheme(
           displayLarge: TextStyle(
             fontSize: 32,
@@ -82,24 +84,22 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Align(
-              alignment: Alignment.center,
-              child: Clock(),
-            ),
-            Expanded(
-              child: UpcomingDoomsdays(),
-            ),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: Padding(
-                padding: EdgeInsets.all(8.0),
-                child: _FloatingActionButton(),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Clock(),
+              SortFilter(),
+              UpcomingDoomsdays(),
+              Align(
+                alignment: Alignment.bottomRight,
+                child: Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: _FloatingActionButton(),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -164,34 +164,169 @@ class _ClockState extends State<Clock> {
   Widget build(BuildContext context) {
     logger.i('Building Clock');
     return Consumer<ClockModel>(builder: (context, clockModel, child) {
-      return
-          // If the countdown is hidden, return an empty container
-          clockModel._hidden
-              ? const SizedBox()
-              : Column(
-                  children: [
-                    Container(
-                      margin: const EdgeInsets.all(20),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary,
-                        borderRadius: BorderRadius.circular(10),
+      return clockModel._hidden
+          ? const SizedBox()
+          : Container(
+              margin: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    '${clockModel._countdownDuration.inDays} days ${clockModel._countdownDuration.inHours.remainder(24).toString().padLeft(2, '0')}:${clockModel._countdownDuration.inMinutes.remainder(60).toString().padLeft(2, '0')}:${clockModel._countdownDuration.inSeconds.remainder(60).toString().padLeft(2, '0')}',
+                    style: Theme.of(context).textTheme.displayLarge,
+                  ),
+                  Text(
+                    "Until ${clockModel._title}",
+                    style: Theme.of(context).textTheme.displayMedium,
+                  ),
+                ],
+              ),
+            );
+    });
+  }
+}
+
+class FilterSortModel extends ChangeNotifier {
+  bool _ascending = true;
+  String _filter = "";
+  String _field = "date";
+  bool _isHidden = true;
+
+  void setFilter(String filter) {
+    _filter = filter;
+    notifyListeners();
+  }
+
+  void setSort(bool ascending) {
+    _ascending = ascending;
+    notifyListeners();
+  }
+
+  void setField(String field) {
+    _field = field;
+    notifyListeners();
+  }
+
+  void setIsHidden(bool value) {
+    _isHidden = value;
+    notifyListeners();
+  }
+
+  bool get ascending => _ascending;
+  String get filter => _filter;
+  String get field => _field;
+  bool get isHidden => _isHidden;
+}
+
+class SortFilter extends StatefulWidget {
+  const SortFilter({super.key});
+
+  @override
+  State<SortFilter> createState() => _SortFilterState();
+}
+
+class _SortFilterState extends State<SortFilter> {
+  bool _isHidden = true;
+  @override
+  Widget build(BuildContext context) {
+    logger.i('Building SortFilter');
+    return Consumer<FilterSortModel>(
+        builder: (context, filterSortModel, child) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            child: const Icon(Icons.filter_list),
+            onTap: () {
+              _isHidden = !_isHidden;
+              filterSortModel.setIsHidden(_isHidden);
+              setState(() {
+                logger.i('Filter and sort options toggled.');
+              });
+            },
+          ),
+          _isHidden
+              ? const SizedBox(height: 0)
+              : Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            const Text('Sort by: '),
+                            const SizedBox(width: 10),
+                            DropdownButton<String>(
+                              value: filterSortModel.field,
+                              items: <String>[
+                                'date',
+                                'title',
+                                'category'
+                              ].map<DropdownMenuItem<String>>((String value) {
+                                return DropdownMenuItem<String>(
+                                  value: value,
+                                  child: Text(value),
+                                );
+                              }).toList(),
+                              onChanged: (String? value) {
+                                filterSortModel.setField(value!);
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Column(
-                        children: [
-                          Text(
-                            '${clockModel._countdownDuration.inDays} days ${clockModel._countdownDuration.inHours.remainder(24).toString().padLeft(2, '0')}:${clockModel._countdownDuration.inMinutes.remainder(60).toString().padLeft(2, '0')}:${clockModel._countdownDuration.inSeconds.remainder(60).toString().padLeft(2, '0')}',
-                            style: Theme.of(context).textTheme.displayLarge,
-                          ),
-                          Text(
-                            "Until ${clockModel._title}",
-                            style: Theme.of(context).textTheme.displayMedium,
-                          ),
-                        ],
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          children: [
+                            const Text('Order: '),
+                            const SizedBox(width: 10),
+                            DropdownButton<String>(
+                              value: filterSortModel.ascending
+                                  ? 'ascending'
+                                  : 'descending',
+                              items: <String>[
+                                'ascending',
+                                'descending'
+                              ].map<DropdownMenuItem<String>>((String value) {
+                                return DropdownMenuItem<String>(
+                                  value: value,
+                                  child: Text(value),
+                                );
+                              }).toList(),
+                              onChanged: (String? value) {
+                                filterSortModel.setSort(value == 'ascending');
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                    )
-                  ],
-                );
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          children: [
+                            const Text('Filter: '),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                onChanged: (String value) {
+                                  filterSortModel.setFilter(value);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+        ],
+      );
     });
   }
 }
@@ -204,191 +339,173 @@ class UpcomingDoomsdays extends StatefulWidget {
 }
 
 class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
-  // Create a reference to the Firebase Storage
   final storageRef = FirebaseStorage.instance.ref();
-
-  //selected list tile
   final Set<int> _selectedIndices = {};
   @override
   Widget build(BuildContext context) {
-    //get the theme of the app
     final theme = Theme.of(context);
-    logger.i('Building UpcomingDoomsdays');
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('doomsday').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          final doomsdays = snapshot.data!.docs.map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            return Doomsday(
-              category: data['category'],
-              title: data['title'],
-              date: data['date'] != null ? DateTime.parse(data['date']) : null,
-              description: data['description'],
-              image: data['image'],
-              icon: data['icon'],
-              docId: doc.id,
-            );
-          }).toList();
-          return ListView.builder(
-            controller: ScrollController(),
-            itemCount: doomsdays.length,
-            itemBuilder: (context, index) {
-              return Card(
-                elevation: 3.0,
-                child: ListTile(
-                  selected: _selectedIndices.contains(index),
-                  selectedTileColor: theme.colorScheme.surface.withAlpha(25),
-                  leading: GestureDetector(
-                    child: doomsdays[index].icon != null
-                        ? FutureBuilder(
-                            future: storageRef
-                                .child(doomsdays[index].icon!)
-                                .getDownloadURL(),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                  ConnectionState.done) {
-                                return snapshot.data != null
-                                    ? Image.network(
-                                        snapshot.data as String,
-                                        width: 50,
-                                        height: 50,
-                                        errorBuilder:
-                                            (context, exception, stackTrace) {
-                                          return const Icon(Icons.error,
-                                              color: Colors.red);
-                                        },
-                                      )
-                                    : const Icon(Icons.error,
-                                        color: Colors.red);
-                              }
-                              if (snapshot.connectionState ==
-                                  ConnectionState.waiting) {
-                                return const CircularProgressIndicator();
-                              }
-                              return const Icon(Icons.error, color: Colors.red);
-                            },
-                          )
+    bool isHidden = !(Provider.of<FilterSortModel>(context).isHidden);
+    return isHidden
+        ? const SizedBox()
+        : StreamBuilder<QuerySnapshot>(
+            stream:
+                FirebaseFirestore.instance.collection('doomsday').snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                logger.i('Building UpcomingDoomsdays');
+                final doomsdays = snapshot.data!.docs.map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return Doomsday(
+                    category: data['category'],
+                    title: data['title'],
+                    date: data['date'] != null
+                        ? DateTime.parse(data['date'])
                         : null,
-                    onTap: () {
-                      // Show a dialog with the image if available
-                      if (doomsdays[index].image != null) {
-                        showDialog(
-                          context: context,
-                          builder: (context) {
-                            logger.i(
-                                'Showing image for doomsday: ${doomsdays[index].description}');
-                            return AlertDialog(
-                              content: doomsdays[index].image != null
-                                  ? FutureBuilder(
-                                      future: storageRef
-                                          .child(doomsdays[index].image!)
-                                          .getDownloadURL(),
-                                      builder: (context, snapshot) {
-                                        if (snapshot.connectionState ==
-                                            ConnectionState.done) {
-                                          return Image.network(
-                                            snapshot.data as String,
-                                            loadingBuilder: (context, child,
-                                                loadingProgress) {
-                                              if (loadingProgress == null) {
-                                                return child;
+                    description: data['description'],
+                    image: data['image'],
+                    icon: data['icon'],
+                    docId: doc.id,
+                  );
+                }).toList();
+                return ListView.builder(
+                  shrinkWrap:
+                      true, // Added this to limit the height of ListView
+                  itemCount: doomsdays.length,
+                  itemBuilder: (context, index) {
+                    return Card(
+                      elevation: 3.0,
+                      child: ListTile(
+                        selected: _selectedIndices.contains(index),
+                        selectedTileColor:
+                            theme.colorScheme.surface.withAlpha(25),
+                        leading: GestureDetector(
+                          child: doomsdays[index].icon != null
+                              ? FutureBuilder(
+                                  future: storageRef
+                                      .child(doomsdays[index].icon!)
+                                      .getDownloadURL(),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.done) {
+                                      return snapshot.data != null
+                                          ? Image.network(
+                                              snapshot.data as String,
+                                              width: 50,
+                                              height: 50,
+                                              errorBuilder: (context, exception,
+                                                  stackTrace) {
+                                                return const Icon(Icons.error,
+                                                    color: Colors.red);
+                                              },
+                                            )
+                                          : const Icon(Icons.error,
+                                              color: Colors.red);
+                                    }
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const CircularProgressIndicator();
+                                    }
+                                    return const Icon(Icons.error,
+                                        color: Colors.red);
+                                  },
+                                )
+                              : null,
+                          onTap: () {
+                            if (doomsdays[index].image != null) {
+                              showDialog(
+                                context: context,
+                                builder: (context) {
+                                  logger.i(
+                                      'Showing image for doomsday: ${doomsdays[index].description}');
+                                  return AlertDialog(
+                                    content: doomsdays[index].image != null
+                                        ? FutureBuilder(
+                                            future: storageRef
+                                                .child(doomsdays[index].image!)
+                                                .getDownloadURL(),
+                                            builder: (context, snapshot) {
+                                              if (snapshot.connectionState ==
+                                                  ConnectionState.done) {
+                                                return Image.network(
+                                                  snapshot.data as String,
+                                                  loadingBuilder: (context,
+                                                      child, loadingProgress) {
+                                                    if (loadingProgress ==
+                                                        null) {
+                                                      return child;
+                                                    }
+                                                    return const CircularProgressIndicator();
+                                                  },
+                                                  errorBuilder: (context,
+                                                      exception, stackTrace) {
+                                                    return const Icon(
+                                                        Icons.error,
+                                                        color: Colors.red);
+                                                  },
+                                                );
                                               }
-                                              return const CircularProgressIndicator();
-                                            },
-                                            errorBuilder: (context, exception,
-                                                stackTrace) {
+                                              if (snapshot.connectionState ==
+                                                  ConnectionState.waiting) {
+                                                return const CircularProgressIndicator();
+                                              }
                                               return const Icon(Icons.error,
                                                   color: Colors.red);
                                             },
-                                          );
-                                        }
-                                        if (snapshot.connectionState ==
-                                            ConnectionState.waiting) {
-                                          return const CircularProgressIndicator();
-                                        }
-                                        return const Icon(Icons.error,
-                                            color: Colors.red);
-                                      },
-                                    )
-                                  : null,
-                            );
+                                          )
+                                        : const Icon(Icons.error,
+                                            color: Colors.red),
+                                  );
+                                },
+                              );
+                            }
                           },
-                        );
-                      }
-                    },
-                  ),
-                  title: Text(
-                    "${doomsdays[index].date!.year} ${doomsdays[index].title} ",
-                    style: theme.textTheme.titleMedium!.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(doomsdays[index].description ?? ""),
-                  tileColor: theme.colorScheme.surface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  contentPadding: const EdgeInsets.all(10),
-                  trailing: GestureDetector(
-                    child: const Icon(Icons.delete, color: Colors.red),
-                    onTap: () {
-                      logger.i(
-                          'Deleting doomsday: ${doomsdays[index].description}');
-                      // Delete the doomsday
-                      FirebaseFirestore.instance
-                          .collection('doomsday')
-                          .doc(doomsdays[index].docId)
-                          .delete();
-                      logger.i(
-                          'Doomsday ${doomsdays[index].title} deleted from firestore.');
-                      //show a message to confirm deletion
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                              'Doomsday ${doomsdays[index].title} deleted.'),
                         ),
-                      );
-                    },
-                  ),
-                  onTap: () {
-                    // When a doomsday is tapped change the selected card
-                    setState(() {
-                      _selectedIndices.clear();
-                      if (_selectedIndices.contains(index)) {
-                        _selectedIndices.remove(index);
-                      } else {
-                        _selectedIndices.add(index);
-                      }
-                    });
-
-                    // Change the target date and title
-                    Provider.of<ClockModel>(context, listen: false)
-                        .changeTarget(doomsdays[index]);
-                    // unhide the countdown
-                    Provider.of<ClockModel>(context, listen: false)
-                        .isHidden(false);
-                    logger.i(
-                        'Changing target to ${doomsdays[index].title} on ${doomsdays[index].date}');
+                        title: Text(doomsdays[index].title!),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(doomsdays[index].category!),
+                            Text(
+                              doomsdays[index].date != null
+                                  ? '${doomsdays[index].date!.year}-${doomsdays[index].date!.month.toString().padLeft(2, '0')}-${doomsdays[index].date!.day.toString().padLeft(2, '0')}'
+                                  : 'No date',
+                            ),
+                            Text(doomsdays[index].description ?? ''),
+                          ],
+                        ),
+                        trailing: GestureDetector(
+                          child: const Icon(Icons.delete, color: Colors.red),
+                          onTap: () async {
+                            await FirebaseFirestore.instance
+                                .collection('doomsday')
+                                .doc(doomsdays[index].docId)
+                                .delete();
+                            setState(() {
+                              logger.i('Deleted doomsday: $index');
+                            });
+                          },
+                        ),
+                        onTap: () {
+                          setState(() {
+                            _selectedIndices.contains(index)
+                                ? _selectedIndices.remove(index)
+                                : _selectedIndices.add(index);
+                          });
+                        },
+                      ),
+                    );
                   },
-                ),
-              );
+                );
+              } else {
+                return const Center(child: CircularProgressIndicator());
+              }
             },
           );
-        } else if (snapshot.hasError) {
-          logger.e('Error: ${snapshot.error}');
-          return Text('Error: ${snapshot.error}');
-        } else {
-          logger.i('Loading data...');
-          return const CircularProgressIndicator();
-        }
-      },
-    );
   }
 }
 
 class _FloatingActionButton extends StatelessWidget {
-  const _FloatingActionButton({super.key});
+  const _FloatingActionButton();
 
   @override
   Widget build(BuildContext context) {
