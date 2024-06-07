@@ -23,9 +23,6 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
   late String? selectedCategory;
   late String? title;
 
-  // list of available categories
-  final _categoryList = <String>[];
-
   //Constructor to initialize the state
   _AddDoomsdayPageState() {
     selectedDate = DateTime.now();
@@ -33,14 +30,17 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
     selectedImage = null;
     selectedCategory = '';
     title = '';
+    _categoryList = <String, dynamic>{};
   }
 
   final imageDropdownItems = <DropdownMenuItem<ImageData>>[];
 
   final FirebaseStorage storage = FirebaseStorage.instance;
 
+  late Map<String, dynamic> _categoryList;
   @override
   build(BuildContext context) {
+    _categoryList = <String, dynamic>{};
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -90,8 +90,14 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
                           snapshot.data!.docs;
                       _categoryList.clear();
                       for (final DocumentSnapshot document in documents) {
-                        _categoryList.add(document['category'] as String);
+                        _categoryList.putIfAbsent(
+                            document.id, () => document['category']);
                       }
+                      var addCategoryID = const Uuid().v4();
+                      _categoryList.putIfAbsent(
+                          //generate new id for the add category option
+                          addCategoryID,
+                          () => 'Add Category');
                       return DropdownButton(
                         isExpanded: true,
                         onChanged: (value) {
@@ -114,12 +120,39 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
                                   actions: [
                                     ElevatedButton(
                                       onPressed: () {
+                                        //check that the category is not empty
+                                        if (controller.text.isEmpty) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  'Please enter a category.'),
+                                            ),
+                                          );
+                                          return;
+                                        }
+                                        // check that the category does not already exist
+                                        if (_categoryList
+                                            .containsValue(controller.text)) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  'Category already exists.'),
+                                            ),
+                                          );
+                                          return;
+                                        }
+                                        // Add category to the list
+                                        final newCategoryID = const Uuid().v4();
+                                        _categoryList[newCategoryID] =
+                                            controller.text;
                                         // Add category to the database
                                         FirebaseFirestore.instance
                                             .collection('categories')
-                                            .add({
-                                          'category': controller.text,
-                                        });
+                                            .doc(newCategoryID)
+                                            .set({'category': controller.text});
+
                                         logger.d(
                                             'Adding category to the database: ${controller.text}');
                                         // Update category
@@ -148,18 +181,12 @@ class _AddDoomsdayPageState extends State<AddDoomsdayPage> {
                           });
                         },
                         value: selectedCategory == '' ? null : selectedCategory,
-                        items: [
-                          ..._categoryList.map((category) {
-                            return DropdownMenuItem<String>(
-                              value: category,
-                              child: Text(category),
-                            );
-                          }),
-                          const DropdownMenuItem<String>(
-                            value: 'Add Category',
-                            child: Text('+ Add Category'),
-                          ),
-                        ],
+                        items: _categoryList.entries
+                            .map((entry) => DropdownMenuItem(
+                                  value: entry.value,
+                                  child: Text(entry.value),
+                                ))
+                            .toList(),
                       );
                     }
                     return const CircularProgressIndicator();

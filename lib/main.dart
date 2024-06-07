@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:doomsday_app/add_doomsday.dart';
 import 'package:doomsday_app/doomsday.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async';
@@ -84,22 +85,22 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       body: const Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Clock(),
-              SortFilter(),
-              UpcomingDoomsdays(),
-              Align(
-                alignment: Alignment.bottomRight,
-                child: Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: _FloatingActionButton(),
-                ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Clock(),
+            SortFilter(),
+            Expanded(
+              child: UpcomingDoomsdays(),
+            ),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Padding(
+                padding: EdgeInsets.all(8.0),
+                child: _FloatingActionButton(),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -195,6 +196,7 @@ class FilterSortModel extends ChangeNotifier {
   String _filter = "";
   String _field = "date";
   bool _isHidden = true;
+  bool _isSorted = false;
 
   void setFilter(String filter) {
     _filter = filter;
@@ -216,10 +218,16 @@ class FilterSortModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setIsSorted(bool value) {
+    _isSorted = value;
+    notifyListeners();
+  }
+
   bool get ascending => _ascending;
   String get filter => _filter;
   String get field => _field;
   bool get isHidden => _isHidden;
+  bool get isSorted => _isSorted;
 }
 
 class SortFilter extends StatefulWidget {
@@ -368,41 +376,42 @@ class _UpcomingDoomsdaysState extends State<UpcomingDoomsdays> {
                   );
                 }).toList();
                 final filterSortModel = Provider.of<FilterSortModel>(context);
-                if (filterSortModel.filter.isNotEmpty) {
-                  doomsdays.retainWhere((doomsday) {
-                    return doomsday.title!.contains(filterSortModel.filter) ||
-                        doomsday.category!.contains(filterSortModel.filter) ||
-                        doomsday.description!.contains(filterSortModel.filter);
-                  });
-                }
-                if (filterSortModel.field == 'date') {
-                  doomsdays.sort((a, b) {
-                    if (filterSortModel.ascending) {
-                      return a.date!.compareTo(b.date!);
-                    } else {
-                      return b.date!.compareTo(a.date!);
-                    }
-                  });
-                } else if (filterSortModel.field == 'title') {
-                  doomsdays.sort((a, b) {
-                    if (filterSortModel.ascending) {
-                      return a.title!.compareTo(b.title!);
-                    } else {
-                      return b.title!.compareTo(a.title!);
-                    }
-                  });
-                } else if (filterSortModel.field == 'category') {
-                  doomsdays.sort((a, b) {
-                    if (filterSortModel.ascending) {
-                      return a.category!.compareTo(b.category!);
-                    } else {
-                      return b.category!.compareTo(a.category!);
-                    }
-                  });
+                if (filterSortModel.isSorted) {
+                  if (filterSortModel.filter.isNotEmpty) {
+                    doomsdays.retainWhere((doomsday) {
+                      return doomsday.title!.contains(filterSortModel.filter) ||
+                          doomsday.category!.contains(filterSortModel.filter) ||
+                          doomsday.description!
+                              .contains(filterSortModel.filter);
+                    });
+                  }
+                  if (filterSortModel.field == 'date') {
+                    doomsdays.sort((a, b) {
+                      if (filterSortModel.ascending) {
+                        return a.date!.compareTo(b.date!);
+                      } else {
+                        return b.date!.compareTo(a.date!);
+                      }
+                    });
+                  } else if (filterSortModel.field == 'title') {
+                    doomsdays.sort((a, b) {
+                      if (filterSortModel.ascending) {
+                        return a.title!.compareTo(b.title!);
+                      } else {
+                        return b.title!.compareTo(a.title!);
+                      }
+                    });
+                  } else if (filterSortModel.field == 'category') {
+                    doomsdays.sort((a, b) {
+                      if (filterSortModel.ascending) {
+                        return a.category!.compareTo(b.category!);
+                      } else {
+                        return b.category!.compareTo(a.category!);
+                      }
+                    });
+                  }
                 }
                 return ListView.builder(
-                  shrinkWrap:
-                      true, // Added this to limit the height of ListView
                   itemCount: doomsdays.length,
                   itemBuilder: (context, index) {
                     return Card(
